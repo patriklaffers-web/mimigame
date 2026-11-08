@@ -15,13 +15,19 @@
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  let W, H;
+  let W, H, SW, SH, zoom = 1; // W/H = world size, SW/SH = screen size
+  // Zoom in on small (phone) screens so everything is drawn bigger
+  function setZoom() {
+    zoom = Math.min(1.6, Math.max(1, 560 / Math.min(SW, SH)));
+    W = SW / zoom; H = SH / zoom;
+  }
   let dpr = 1;
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = innerWidth; H = innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    SW = innerWidth; SH = innerHeight;
+    canvas.width = SW * dpr; canvas.height = SH * dpr;
+    canvas.style.width = SW + 'px'; canvas.style.height = SH + 'px';
+    setZoom();
   }
   addEventListener('resize', resize); resize();
 
@@ -38,7 +44,7 @@
   const STICK_R = 55;
   const sticks = { move: null, aim: null }; // each: { id, ox, oy, x, y }
   let isTouch = 'ontouchstart' in window;
-  function reloadBtn() { return { x: W - 44, y: 44, r: 30 }; }
+  function reloadBtn() { return { x: SW - 48, y: 48, r: 34 }; }
   function stickVec(st) {
     if (!st) return { x: 0, y: 0, mag: 0 };
     const dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy);
@@ -52,7 +58,7 @@
       const x = t.clientX, y = t.clientY, rb = reloadBtn();
       if (Math.hypot(x - rb.x, y - rb.y) < rb.r + 10) { reload(); continue; }
       const st = { id: t.identifier, ox: x, oy: y, x, y };
-      if (x < W / 2) { if (!sticks.move) sticks.move = st; }
+      if (x < SW / 2) { if (!sticks.move) sticks.move = st; }
       else if (!sticks.aim) sticks.aim = st;
     }
   }, { passive: false });
@@ -148,7 +154,7 @@
         firing = aimV.mag > 0.25;
         if (aimV.mag > 0.1) player.angle = Math.atan2(aimV.y, aimV.x);
         else if (sticks.move && stickVec(sticks.move).mag > 0.1) player.angle = Math.atan2(dy, dx);
-      } else player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+      } else player.angle = Math.atan2(mouse.y / zoom - player.y, mouse.x / zoom - player.x);
       player.invuln = Math.max(0, player.invuln - dt);
       player.fireCd -= dt;
       player.recoil = Math.max(0, player.recoil - dt * 30);
@@ -244,6 +250,7 @@
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale(sc, sc);
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 4;
     const bone = s.hit > 0 ? '#fff' : (s.tough ? '#c9b98f' : '#e8e2cf');
     ctx.strokeStyle = bone; ctx.fillStyle = bone; ctx.lineCap = 'round';
     // legs
@@ -332,11 +339,11 @@
 
   function centerText(big, small) {
     ctx.textAlign = 'center';
-    const k = Math.min(1, W / 520);
+    const k = Math.min(1, SW / 520);
     ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(48 * k)}px system-ui, sans-serif`;
-    ctx.fillText(big, W / 2, H / 2 - 10);
+    ctx.fillText(big, SW / 2, SH / 2 - 10);
     ctx.font = `${Math.max(14, Math.round(18 * k))}px system-ui, sans-serif`; ctx.fillStyle = '#ccc';
-    small.split('\n').forEach((line, i) => ctx.fillText(line, W / 2, H / 2 + 26 + i * 24));
+    small.split('\n').forEach((line, i) => ctx.fillText(line, SW / 2, SH / 2 + 26 + i * 24));
   }
 
   function drawStick(st, label, color) {
@@ -352,11 +359,11 @@
   function drawTouchControls() {
     if (!isTouch || !started) return;
     // hints where no finger is down
-    ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
     if (sticks.move) drawStick(sticks.move, 'MOVE', '#2e86de');
-    else ctx.fillText('drag here to MOVE', W * 0.25, H - 30);
+    else ctx.fillText('drag here to MOVE', SW * 0.25, SH - 30);
     if (sticks.aim) drawStick(sticks.aim, 'AIM', '#e74c3c');
-    else ctx.fillText('drag here to AIM & SHOOT', W * 0.75, H - 30);
+    else ctx.fillStyle = 'rgba(255,255,255,0.3)', ctx.fillText('drag here to AIM & SHOOT', SW * 0.75, SH - 30);
     // reload button
     const rb = reloadBtn();
     ctx.globalAlpha = player.reloading > 0 ? 0.3 : 0.6;
@@ -371,9 +378,10 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.save();
     if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    ctx.scale(zoom, zoom);
     // ground
-    ctx.fillStyle = '#2b2a26'; ctx.fillRect(-20, -20, W + 40, H + 40);
-    ctx.strokeStyle = '#33322d'; ctx.lineWidth = 1;
+    ctx.fillStyle = '#34332e'; ctx.fillRect(-20, -20, W + 40, H + 40);
+    ctx.strokeStyle = '#403e37'; ctx.lineWidth = 1;
     for (let x = 0; x < W; x += 48) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
     for (let y = 0; y < H; y += 48) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
@@ -388,8 +396,9 @@
     for (const s of skeletons) drawSkeleton(s);
     drawPlayer();
 
-    ctx.fillStyle = '#ffe9a8';
-    for (const b of bullets) { ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#fff3c4'; ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 8;
+    for (const b of bullets) { ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.shadowBlur = 0;
     for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -398,12 +407,12 @@
     drawTouchControls();
 
     if (!started) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, SW, SH);
       centerText('BONE BLASTER', isTouch
         ? 'Left thumb: move · Right thumb: aim & shoot\nR button: reload\nTap to start'
         : 'WASD / arrows to move · mouse to aim · click to shoot · R to reload\nClick to start');
     } else if (!player.alive) {
-      ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, SW, SH);
       centerText('YOU DIED', `Respawning in ${Math.max(0, player.respawnTimer).toFixed(1)}s...`);
     } else if (skeletons.length === 0 && toSpawn === 0 && wave > 0) {
       centerText(`Wave ${wave} cleared!`, 'Get ready...');
