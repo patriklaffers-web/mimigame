@@ -13,4 +13,10 @@ Open `index.html` in a browser — no build step or dependencies.
 - **Click / hold** — shoot
 - **R** — reload (12-round magazine, auto-reloads when empty)
 
+### On a phone / tablet
+
+- **Left thumb** — drag anywhere on the left half to move
+- **Right thumb** — drag anywhere on the right half to aim; it fires automatically while you hold
+- **R button** (top-right) — reload
+
 Tougher, tan skeletons with red eyes take more hits. Each cleared wave brings a bigger, faster one.

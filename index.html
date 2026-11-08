@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Bone Blaster</title>
 <style>
   html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
-  canvas { display: block; cursor: crosshair; }
+  canvas { display: block; cursor: crosshair; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 </style>
 </head>
 <body>
@@ -16,7 +16,13 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   let W, H;
-  function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+  let dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  }
   addEventListener('resize', resize); resize();
 
   // ---------- Input ----------
@@ -27,6 +33,49 @@
   canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   canvas.addEventListener('mousedown', () => { mouse.down = true; started = true; });
   addEventListener('mouseup', () => { mouse.down = false; });
+
+  // ---------- Touch: twin-stick (left = move, right = aim & fire) ----------
+  const STICK_R = 55;
+  const sticks = { move: null, aim: null }; // each: { id, ox, oy, x, y }
+  let isTouch = 'ontouchstart' in window;
+  function reloadBtn() { return { x: W - 44, y: 44, r: 30 }; }
+  function stickVec(st) {
+    if (!st) return { x: 0, y: 0, mag: 0 };
+    const dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy);
+    const m = Math.min(d, STICK_R) / STICK_R;
+    return d ? { x: dx / d * m, y: dy / d * m, mag: m } : { x: 0, y: 0, mag: 0 };
+  }
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault(); isTouch = true;
+    if (!started) { started = true; return; }
+    for (const t of e.changedTouches) {
+      const x = t.clientX, y = t.clientY, rb = reloadBtn();
+      if (Math.hypot(x - rb.x, y - rb.y) < rb.r + 10) { reload(); continue; }
+      const st = { id: t.identifier, ox: x, oy: y, x, y };
+      if (x < W / 2) { if (!sticks.move) sticks.move = st; }
+      else if (!sticks.aim) sticks.aim = st;
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches)
+      for (const k of ['move', 'aim']) {
+        const st = sticks[k];
+        if (st && st.id === t.identifier) {
+          st.x = t.clientX; st.y = t.clientY;
+          // drag the base along so the stick never feels "stuck" at the edge
+          const dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy);
+          if (d > STICK_R * 1.5) { st.ox = st.x - dx / d * STICK_R * 1.5; st.oy = st.y - dy / d * STICK_R * 1.5; }
+        }
+      }
+  }, { passive: false });
+  function endTouch(e) {
+    e.preventDefault();
+    for (const t of e.changedTouches)
+      for (const k of ['move', 'aim']) if (sticks[k] && sticks[k].id === t.identifier) sticks[k] = null;
+  }
+  canvas.addEventListener('touchend', endTouch, { passive: false });
+  canvas.addEventListener('touchcancel', endTouch, { passive: false });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
   // ---------- State ----------
@@ -57,7 +106,8 @@
 
   function startWave() {
     wave++;
-    const n = 4 + wave * 2;
+    // fewer skeletons on small (phone) screens so it stays fair
+    const n = Math.max(3, Math.round((4 + wave * 2) * Math.min(1, Math.max(0.5, W * H / (1000 * 650)))));
     toSpawn = n; spawnCd = 0; waveTimer = 0;
   }
 
@@ -88,10 +138,17 @@
     if (player.alive) {
       let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
       let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
-      const len = Math.hypot(dx, dy) || 1;
+      let len = Math.hypot(dx, dy) || 1;
+      if (sticks.move) { const v = stickVec(sticks.move); dx = v.x; dy = v.y; len = 1; }
       player.x = Math.max(player.r, Math.min(W - player.r, player.x + dx / len * player.speed * dt));
       player.y = Math.max(player.r, Math.min(H - player.r, player.y + dy / len * player.speed * dt));
-      player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+      const aimV = stickVec(sticks.aim);
+      let firing = mouse.down;
+      if (isTouch) {
+        firing = aimV.mag > 0.25;
+        if (aimV.mag > 0.1) player.angle = Math.atan2(aimV.y, aimV.x);
+        else if (sticks.move && stickVec(sticks.move).mag > 0.1) player.angle = Math.atan2(dy, dx);
+      } else player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
       player.invuln = Math.max(0, player.invuln - dt);
       player.fireCd -= dt;
       player.recoil = Math.max(0, player.recoil - dt * 30);
@@ -99,7 +156,7 @@
       if (player.reloading > 0) {
         player.reloading -= dt;
         if (player.reloading <= 0) player.ammo = MAG_SIZE;
-      } else if (mouse.down && player.fireCd <= 0) {
+      } else if (firing && player.fireCd <= 0) {
         if (player.ammo > 0) {
           player.ammo--; player.fireCd = FIRE_DELAY; player.recoil = 5; shake = Math.max(shake, 3);
           const spread = (Math.random() - 0.5) * 0.06, a = player.angle + spread;
@@ -275,13 +332,43 @@
 
   function centerText(big, small) {
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 48px system-ui, sans-serif';
+    const k = Math.min(1, W / 520);
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(48 * k)}px system-ui, sans-serif`;
     ctx.fillText(big, W / 2, H / 2 - 10);
-    ctx.font = '18px system-ui, sans-serif'; ctx.fillStyle = '#ccc';
-    ctx.fillText(small, W / 2, H / 2 + 26);
+    ctx.font = `${Math.max(14, Math.round(18 * k))}px system-ui, sans-serif`; ctx.fillStyle = '#ccc';
+    small.split('\n').forEach((line, i) => ctx.fillText(line, W / 2, H / 2 + 26 + i * 24));
+  }
+
+  function drawStick(st, label, color) {
+    const v = stickVec(st);
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(st.ox, st.oy, STICK_R, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.6; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(st.ox + v.x * STICK_R, st.oy + v.y * STICK_R, 24, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTouchControls() {
+    if (!isTouch || !started) return;
+    // hints where no finger is down
+    ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    if (sticks.move) drawStick(sticks.move, 'MOVE', '#2e86de');
+    else ctx.fillText('drag here to MOVE', W * 0.25, H - 30);
+    if (sticks.aim) drawStick(sticks.aim, 'AIM', '#e74c3c');
+    else ctx.fillText('drag here to AIM & SHOOT', W * 0.75, H - 30);
+    // reload button
+    const rb = reloadBtn();
+    ctx.globalAlpha = player.reloading > 0 ? 0.3 : 0.6;
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(rb.x, rb.y, rb.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffd36b'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffd36b'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    ctx.fillText('R', rb.x, rb.y + 1); ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = 1;
   }
 
   function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.save();
     if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     // ground
@@ -308,10 +395,13 @@
     ctx.restore();
 
     drawHUD();
+    drawTouchControls();
 
     if (!started) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
-      centerText('BONE BLASTER', 'WASD / arrows to move · mouse to aim · click to shoot · R to reload — click to start');
+      centerText('BONE BLASTER', isTouch
+        ? 'Left thumb: move · Right thumb: aim & shoot\nR button: reload\nTap to start'
+        : 'WASD / arrows to move · mouse to aim · click to shoot · R to reload\nClick to start');
     } else if (!player.alive) {
       ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
       centerText('YOU DIED', `Respawning in ${Math.max(0, player.respawnTimer).toFixed(1)}s...`);
