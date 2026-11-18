@@ -102,7 +102,11 @@ $('connectBtn').addEventListener('click', async () => {
     refreshSettingsUI();
     if (installedSig !== configSignature(config())) await install();
   } catch (err) {
-    if (err.name !== 'NotFoundError') log(`Connection failed: ${err.message}`, 'err'); // NotFoundError = picker cancelled
+    if (err.name === 'SecurityError') {
+      // e.g. page embedded in a frame that isn't allowed to use Bluetooth
+      $('noBt').style.display = 'block';
+      log('Bluetooth is blocked on this page. Download the app file and open it in Chrome or Edge instead.', 'err');
+    } else if (err.name !== 'NotFoundError') log(`Connection failed: ${err.message}`, 'err'); // NotFoundError = picker cancelled
     if (hub?.connected) hub.disconnect(); else onDisconnect();
   } finally {
     $('connectBtn').disabled = false;

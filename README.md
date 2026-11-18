@@ -22,6 +22,9 @@ over Bluetooth. It runs in the browser, with nothing to install.
 
 ## Running it
 
+**Easiest:** download `spike-car-remote.html` and double-click it to open it in Chrome or Edge. It's the whole app in one file, with no server needed. Rebuild it after editing the source with `npm run build`.
+
+
 **GitHub Pages:** in the repo, go to *Settings → Pages* and deploy from this branch's root. Then open the URL on your phone or laptop.
 
 **Locally:**

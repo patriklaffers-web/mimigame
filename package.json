@@ -1,1 +1,1 @@
-{ "name": "spike-car-remote", "private": true, "type": "module", "scripts": { "test": "node test/protocol.test.mjs" } }
+{ "name": "spike-car-remote", "private": true, "type": "module", "scripts": { "test": "node test/protocol.test.mjs", "build": "node build.mjs" } }

@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16181d">
+<title>SPIKE Car Remote</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #16181d; --muted: #646a76; --line: #dfe2e8;
+    --accent: #ffcf00; --accent-ink: #16181d; --go: #1f9d55; --stop: #d63b3b; --key: #eceef2;
+    --key-active: #ffcf00; --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101216; --panel: #1a1d23; --ink: #eef0f4; --muted: #9aa1ad; --line: #2b2f37;
+      --key: #262a32; --key-active: #ffcf00;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: 1100px; margin: 0 auto 16px; }
+  h1 { font-size: 20px; margin: 0; flex: 1 1 auto; letter-spacing: -0.01em; }
+  h1 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); margin-right: 8px; vertical-align: 1px; }
+  h1 .dot.on { background: var(--go); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  button { font: inherit; color: inherit; border: 1px solid var(--line); background: var(--panel);
+    border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  button.danger { background: var(--stop); color: #fff; border-color: transparent; }
+  .pill { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+  main { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 820px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
+
+  /* Drive pad */
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 360px; margin: 4px auto 16px;
+    touch-action: none; user-select: none; -webkit-user-select: none; }
+  .pad button { aspect-ratio: 1; font-size: 30px; border-radius: 18px; background: var(--key); border: none;
+    display: grid; place-items: center; touch-action: none; transition: transform .05s, background .1s; }
+  .pad button.active { background: var(--key-active); color: var(--accent-ink); transform: scale(.96); }
+  .pad button.stop { background: var(--stop); color: #fff; font-size: 15px; font-weight: 700; letter-spacing: .05em; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .row + .row { margin-top: 10px; }
+  label { font-size: 14px; }
+  .slider { display: grid; grid-template-columns: 70px 1fr 48px; align-items: center; gap: 10px; margin-top: 10px; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select, input[type=number] { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+  .progress { height: 6px; background: var(--key); border-radius: 3px; overflow: hidden; margin-top: 12px; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+  .status { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 1.4em; }
+  .status.ok { color: var(--go); } .status.err { color: var(--stop); }
+
+  .telemetry { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 600; overflow-wrap: anywhere; }
+  .empty { color: var(--muted); font-size: 14px; }
+
+  textarea { width: 100%; min-height: 180px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; color: inherit;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical;
+    white-space: pre; overflow: auto; tab-size: 4; }
+  #log { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); border-radius: 10px;
+    padding: 10px; height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .banner { max-width: 1100px; margin: 0 auto 16px; padding: 12px 16px; border-radius: var(--radius);
+    background: color-mix(in srgb, var(--stop) 14%, var(--panel)); border: 1px solid var(--stop); display: none; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot" id="dot"></span>SPIKE Car Remote</h1>
+  <span class="pill" id="hubInfo">Not connected</span>
+  <button class="primary" id="connectBtn">Connect hub</button>
+</header>
+
+<div class="banner" id="noBt">
+  <strong>Web Bluetooth isn't available here.</strong>
+  Open this page in Chrome or Edge on Windows, macOS, Linux, ChromeOS or Android
+  (on iPhone/iPad use the Bluefy browser). The page must be served over HTTPS or from localhost.
+</div>
+
+<main>
+  <div class="stack">
+    <section class="card">
+      <h2>Drive</h2>
+      <div class="pad" id="pad">
+        <button data-dir="fl" aria-label="Forward left">↖</button>
+        <button data-dir="f" aria-label="Forward">↑</button>
+        <button data-dir="fr" aria-label="Forward right">↗</button>
+        <button data-dir="l" aria-label="Spin left">↺</button>
+        <button class="stop" id="stopBtn" aria-label="Stop">STOP</button>
+        <button data-dir="r" aria-label="Spin right">↻</button>
+        <button data-dir="bl" aria-label="Back left">↙</button>
+        <button data-dir="b" aria-label="Backward">↓</button>
+        <button data-dir="br" aria-label="Back right">↘</button>
+      </div>
+      <div class="row" style="justify-content:center">
+        <button id="hornBtn">📯 Horn</button>
+      </div>
+      <div class="slider"><label for="speed">Speed</label><input type="range" id="speed" min="10" max="100" step="5" value="60"><output id="speedOut">60%</output></div>
+      <div class="slider"><label for="turn">Turning</label><input type="range" id="turn" min="10" max="100" step="5" value="40"><output id="turnOut">40%</output></div>
+      <p class="hint">Hold a button to drive, release to stop. Keyboard: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys, <kbd>Space</kbd> stop, <kbd>H</kbd> horn. A gamepad's left stick works too.</p>
+    </section>
+
+    <section class="card">
+      <h2>Sensors &amp; motors</h2>
+      <div class="telemetry" id="telemetry"><div class="empty">Connect the hub to see live data.</div></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <h2>Car setup</h2>
+      <div class="grid2">
+        <label>Left motor port<br><select id="leftPort"></select></label>
+        <label>Right motor port<br><select id="rightPort"></select></label>
+        <label><input type="checkbox" id="revLeft" checked> Reverse left motor</label>
+        <label><input type="checkbox" id="revRight"> Reverse right motor</label>
+      </div>
+      <div class="row">
+        <label>Program slots <input type="number" id="slotBase" min="0" max="11" value="10" style="width:64px"></label>
+        <span class="hint" id="slotRange" style="margin:0">uses 10–18</span>
+      </div>
+      <div class="row">
+        <button class="primary" id="installBtn" disabled>Install drive programs</button>
+      </div>
+      <div class="progress"><div id="progress"></div></div>
+      <div class="status" id="installStatus">Programs are installed onto the hub once, then driving is instant.</div>
+      <details style="margin-top:10px">
+        <summary>How this works</summary>
+        <p class="hint">The hub runs the official SPIKE&nbsp;3 firmware. This page uploads a small Python program for each
+        direction into the program slots above (overwriting whatever was there), then starts and stops those programs as you
+        press and release the buttons. If the car drives backwards, toggle both reverse boxes; if it turns the wrong way,
+        swap the ports.</p>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Run your own Python</h2>
+      <textarea id="code" spellcheck="false"></textarea>
+      <div class="row">
+        <label>Slot <input type="number" id="codeSlot" min="0" max="19" value="19" style="width:64px"></label>
+        <button class="primary" id="runBtn" disabled>Upload &amp; run</button>
+        <button id="stopCodeBtn" disabled>Stop</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Hub console</h2>
+      <pre id="log"></pre>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+// ---- spike.js
+// SPIKE Prime / Essential hub BLE protocol (SPIKE App 3 firmware).
+// Implements framing, COBS, CRC32 and the request/response messages documented
+// at https://lego.github.io/spike-prime-docs/
+
+const SERVICE = '0000fd02-0000-1000-8000-00805f9b34fb';
+const RX_CHAR = '0000fd02-0001-1000-8000-00805f9b34fb'; // hub receives
+const TX_CHAR = '0000fd02-0002-1000-8000-00805f9b34fb'; // hub transmits
+
+const MSG = {
+  InfoRequest: 0x00, InfoResponse: 0x01,
+  StartFileUploadRequest: 0x0c, StartFileUploadResponse: 0x0d,
+  TransferChunkRequest: 0x10, TransferChunkResponse: 0x11,
+  ProgramFlowRequest: 0x1e, ProgramFlowResponse: 0x1f, ProgramFlowNotification: 0x20,
+  ConsoleNotification: 0x21,
+  DeviceNotificationRequest: 0x28, DeviceNotificationResponse: 0x29,
+  TunnelMessage: 0x32,
+  DeviceNotification: 0x3c,
+  ClearSlotRequest: 0x46, ClearSlotResponse: 0x47,
+};
+
+// ---------------------------------------------------------------- COBS ------
+const DELIMITER = 0x02;
+const NO_DELIMITER = 0xff;
+const MAX_BLOCK_SIZE = 84;
+const XOR = 0x03;
+
+function cobsEncode(data) {
+  const out = [];
+  let codeIndex = 0, block = 0;
+  const begin = () => { codeIndex = out.length; out.push(NO_DELIMITER); block = 1; };
+  begin();
+  for (const byte of data) {
+    if (byte > DELIMITER) { out.push(byte); block++; }
+    if (byte <= DELIMITER || block > MAX_BLOCK_SIZE) {
+      if (byte <= DELIMITER) out[codeIndex] = byte * MAX_BLOCK_SIZE + block + DELIMITER;
+      begin();
+    }
+  }
+  out[codeIndex] = block + DELIMITER;
+  return Uint8Array.from(out);
+}
+
+function cobsDecode(data) {
+  const out = [];
+  const unescape = (code) => {
+    if (code === 0xff) return [null, MAX_BLOCK_SIZE + 1];
+    let value = Math.floor((code - DELIMITER) / MAX_BLOCK_SIZE);
+    let block = (code - DELIMITER) % MAX_BLOCK_SIZE;
+    if (block === 0) { block = MAX_BLOCK_SIZE; value -= 1; }
+    return [value, block];
+  };
+  let [value, block] = unescape(data[0]);
+  for (let i = 1; i < data.length; i++) {
+    block--;
+    if (block > 0) { out.push(data[i]); continue; }
+    if (value !== null) out.push(value);
+    [value, block] = unescape(data[i]);
+  }
+  return Uint8Array.from(out);
+}
+
+function pack(payload) {
+  const enc = cobsEncode(payload);
+  const out = new Uint8Array(enc.length + 1);
+  for (let i = 0; i < enc.length; i++) out[i] = enc[i] ^ XOR;
+  out[enc.length] = DELIMITER;
+  return out;
+}
+
+function unpack(frame) {
+  let start = frame[0] === 0x01 ? 1 : 0;
+  const body = frame.slice(start, frame[frame.length - 1] === DELIMITER ? -1 : undefined);
+  return cobsDecode(body.map((b) => b ^ XOR));
+}
+
+// --------------------------------------------------------------- CRC32 ------
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+/** zlib-compatible crc32 with seed, data zero-padded to 4-byte alignment. */
+function crc32(data, seed = 0) {
+  const rem = data.length % 4;
+  if (rem) { const p = new Uint8Array(data.length + 4 - rem); p.set(data); data = p; }
+  let c = (seed ^ 0xffffffff) >>> 0;
+  for (const b of data) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// ------------------------------------------------------- Message builders ---
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+const build = {
+  info: () => Uint8Array.of(MSG.InfoRequest),
+  clearSlot: (slot) => Uint8Array.of(MSG.ClearSlotRequest, slot),
+  programFlow: (stop, slot) => Uint8Array.of(MSG.ProgramFlowRequest, stop ? 1 : 0, slot),
+  deviceNotifications: (ms) => Uint8Array.of(MSG.DeviceNotificationRequest, ms & 0xff, (ms >> 8) & 0xff),
+  startFileUpload(name, slot, crc) {
+    const n = enc.encode(name);
+    if (n.length > 31) throw new Error('File name too long');
+    const b = new Uint8Array(1 + n.length + 1 + 1 + 4);
+    const v = new DataView(b.buffer);
+    b[0] = MSG.StartFileUploadRequest;
+    b.set(n, 1);
+    b[1 + n.length] = 0; // null terminator
+    b[2 + n.length] = slot;
+    v.setUint32(3 + n.length, crc, true);
+    return b;
+  },
+  transferChunk(runningCrc, chunk) {
+    const b = new Uint8Array(7 + chunk.length);
+    const v = new DataView(b.buffer);
+    b[0] = MSG.TransferChunkRequest;
+    v.setUint32(1, runningCrc, true);
+    v.setUint16(5, chunk.length, true);
+    b.set(chunk, 7);
+    return b;
+  },
+};
+
+// ------------------------------------------------------- Message parsing ----
+const DEVICE_MESSAGES = {
+  0x00: ['battery', 2, (v) => ({ level: v.getUint8(1) })],
+  0x01: ['imu', 21, (v) => ({
+    faceUp: v.getUint8(1), yawFace: v.getUint8(2),
+    yaw: v.getInt16(3, true), pitch: v.getInt16(5, true), roll: v.getInt16(7, true),
+  })],
+  0x02: ['matrix', 26, () => ({})],
+  0x0a: ['motor', 12, (v) => ({
+    port: v.getUint8(1), type: v.getUint8(2), absPos: v.getInt16(3, true),
+    power: v.getInt16(5, true), speed: v.getInt8(7), position: v.getInt32(8, true),
+  })],
+  0x0b: ['force', 4, (v) => ({ port: v.getUint8(1), value: v.getUint8(2), pressed: !!v.getUint8(3) })],
+  0x0c: ['color', 10, (v) => ({
+    port: v.getUint8(1), color: v.getInt8(2),
+    r: v.getUint16(3, true), g: v.getUint16(5, true), b: v.getUint16(7, true),
+  })],
+  0x0d: ['distance', 4, (v) => ({ port: v.getUint8(1), mm: v.getInt16(2, true) })],
+  0x0e: ['matrix3x3', 11, (v) => ({ port: v.getUint8(1) })],
+};
+
+function parseDevicePayload(p) {
+  const out = [];
+  let i = 0;
+  while (i < p.length) {
+    const def = DEVICE_MESSAGES[p[i]];
+    if (!def || i + def[1] > p.length) break;
+    const v = new DataView(p.buffer, p.byteOffset + i, def[1]);
+    out.push({ kind: def[0], ...def[2](v) });
+    i += def[1];
+  }
+  return out;
+}
+
+function parseMessage(m) {
+  const v = new DataView(m.buffer, m.byteOffset, m.byteLength);
+  const id = m[0];
+  switch (id) {
+    case MSG.InfoResponse:
+      return {
+        id, rpc: `${m[1]}.${m[2]}.${v.getUint16(3, true)}`,
+        firmware: `${m[5]}.${m[6]}.${v.getUint16(7, true)}`,
+        maxPacketSize: v.getUint16(9, true), maxMessageSize: v.getUint16(11, true),
+        maxChunkSize: v.getUint16(13, true), productGroupDevice: v.getUint16(15, true),
+      };
+    case MSG.StartFileUploadResponse: case MSG.TransferChunkResponse:
+    case MSG.ProgramFlowResponse: case MSG.DeviceNotificationResponse:
+    case MSG.ClearSlotResponse:
+      return { id, success: m[1] === 0 };
+    case MSG.ProgramFlowNotification:
+      return { id, stopped: !!m[1] };
+    case MSG.ConsoleNotification: {
+      let end = m.indexOf(0, 1); if (end < 0) end = m.length;
+      return { id, text: dec.decode(m.subarray(1, end)) };
+    }
+    case MSG.DeviceNotification: {
+      const size = v.getUint16(1, true);
+      return { id, devices: parseDevicePayload(m.subarray(3, 3 + size)) };
+    }
+    default:
+      return { id };
+  }
+}
+
+// ------------------------------------------------------------------ Hub -----
+const RESPONSE_FOR = {
+  [MSG.InfoRequest]: MSG.InfoResponse,
+  [MSG.StartFileUploadRequest]: MSG.StartFileUploadResponse,
+  [MSG.TransferChunkRequest]: MSG.TransferChunkResponse,
+  [MSG.ProgramFlowRequest]: MSG.ProgramFlowResponse,
+  [MSG.DeviceNotificationRequest]: MSG.DeviceNotificationResponse,
+  [MSG.ClearSlotRequest]: MSG.ClearSlotResponse,
+};
+
+class Hub extends EventTarget {
+  constructor() {
+    super();
+    this.device = null;
+    this.rx = null;
+    this.info = null;
+    this._queue = Promise.resolve();
+    this._pending = null;
+    this._buf = { low: [], high: [], cur: null };
+  }
+
+  get connected() { return !!this.device?.gatt?.connected; }
+
+  async connect() {
+    if (!navigator.bluetooth) throw new Error('Web Bluetooth is not available in this browser. Use Chrome or Edge (desktop or Android).');
+    this.device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
+    this.device.addEventListener('gattserverdisconnected', () => {
+      this._rejectPending(new Error('Disconnected'));
+      this.dispatchEvent(new Event('disconnect'));
+    });
+    const server = await this.device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE);
+    this.rx = await service.getCharacteristic(RX_CHAR);
+    const tx = await service.getCharacteristic(TX_CHAR);
+    tx.addEventListener('characteristicvaluechanged', (e) => {
+      this._onBytes(new Uint8Array(e.target.value.buffer, e.target.value.byteOffset, e.target.value.byteLength));
+    });
+    await tx.startNotifications();
+    this.info = await this.request(build.info());
+    return this.info;
+  }
+
+  disconnect() { if (this.device?.gatt?.connected) this.device.gatt.disconnect(); }
+
+  _onBytes(bytes) {
+    const b = this._buf;
+    for (const byte of bytes) {
+      if (byte === 0x01) { // start of high-priority message
+        if (b.cur === 'high') b.high = [];
+        b.cur = 'high';
+      } else if (byte === 0x02) { // end of message
+        const which = b.cur ?? 'low';
+        const frame = b[which];
+        b[which] = [];
+        b.cur = which === 'high' && b.low.length ? 'low' : null;
+        if (frame.length) this._onFrame(Uint8Array.from(frame));
+      } else {
+        b[b.cur ?? 'low'].push(byte);
+        if (!b.cur) b.cur = 'low';
+      }
+    }
+  }
+
+  _onFrame(frame) {
+    let msg;
+    try { msg = parseMessage(unpack(frame)); } catch (e) { console.warn('Bad frame', e); return; }
+    if (this._pending && this._pending.expect === msg.id) {
+      const p = this._pending; this._pending = null; clearTimeout(p.timer); p.resolve(msg);
+    }
+    this.dispatchEvent(Object.assign(new Event('message'), { message: msg }));
+  }
+
+  _rejectPending(err) {
+    if (this._pending) { const p = this._pending; this._pending = null; clearTimeout(p.timer); p.reject(err); }
+  }
+
+  async _write(payload) {
+    const frame = pack(payload);
+    const size = this.info?.maxPacketSize || frame.length;
+    for (let i = 0; i < frame.length; i += size) {
+      await this.rx.writeValueWithoutResponse(frame.subarray(i, i + size));
+    }
+  }
+
+  /** Send a request and wait for its response. Requests are serialized. */
+  request(payload, timeoutMs = 5000) {
+    const run = () => new Promise((resolve, reject) => {
+      if (!this.connected) return reject(new Error('Not connected'));
+      const timer = setTimeout(() => { this._pending = null; reject(new Error('Hub did not respond')); }, timeoutMs);
+      this._pending = { expect: RESPONSE_FOR[payload[0]], resolve, reject, timer };
+      this._write(payload).catch((e) => this._rejectPending(e));
+    });
+    const p = this._queue.then(run, run);
+    this._queue = p.catch(() => {});
+    return p;
+  }
+
+  enableDeviceNotifications(intervalMs = 250) { return this.request(build.deviceNotifications(intervalMs)); }
+  startProgram(slot) { return this.request(build.programFlow(false, slot)); }
+  stopProgram(slot) { return this.request(build.programFlow(true, slot)); }
+
+  /** Upload Python source into a program slot. */
+  async uploadProgram(slot, source, name = 'program.py') {
+    const data = enc.encode(source);
+    await this.request(build.clearSlot(slot)); // NACK just means the slot was empty
+    const start = await this.request(build.startFileUpload(name, slot, crc32(data)));
+    if (!start.success) throw new Error(`Hub refused upload to slot ${slot}`);
+    // keep chunks 4-byte aligned so the running CRC matches the file CRC
+    const chunkSize = Math.max(4, (this.info?.maxChunkSize || 256) & ~3);
+    let running = 0;
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.subarray(i, i + chunkSize);
+      running = crc32(chunk, running);
+      const r = await this.request(build.transferChunk(running, chunk));
+      if (!r.success) throw new Error(`Chunk transfer failed (slot ${slot})`);
+    }
+  }
+}
+
+// ---- programs.js
+// MicroPython programs (SPIKE 3 API) that get installed on the hub.
+
+const PORTS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// Each direction is [left factor, right factor]; "turn" factors use the turning speed.
+const DIRECTIONS = {
+  f:  { left: 1, right: 1 },
+  b:  { left: -1, right: -1 },
+  l:  { left: -1, right: 1, spin: true },
+  r:  { left: 1, right: -1, spin: true },
+  fl: { left: 0.35, right: 1 },
+  fr: { left: 1, right: 0.35 },
+  bl: { left: -0.35, right: -1 },
+  br: { left: -1, right: -0.35 },
+};
+const DIR_ORDER = ['f', 'b', 'l', 'r', 'fl', 'fr', 'bl', 'br'];
+const HORN = 'horn';
+const PROGRAM_COUNT = DIR_ORDER.length + 1; // + horn
+
+const MAX_DEG_PER_SEC = 1000;
+
+function slotFor(base, key) {
+  const i = key === HORN ? DIR_ORDER.length : DIR_ORDER.indexOf(key);
+  return base + i;
+}
+
+function driveProgram(dir, cfg) {
+  const d = DIRECTIONS[dir];
+  const pct = d.spin ? cfg.turn : cfg.speed;
+  const v = (f, rev) => Math.round(f * pct / 100 * MAX_DEG_PER_SEC * (rev ? -1 : 1));
+  const l = v(d.left, cfg.revLeft);
+  const r = v(d.right, cfg.revRight);
+  return `from hub import port
+import motor, runloop
+
+async def main():
+    motor.run(port.${cfg.leftPort}, ${l})
+    motor.run(port.${cfg.rightPort}, ${r})
+    while True:
+        await runloop.sleep_ms(1000)
+
+runloop.run(main())
+`;
+}
+
+function hornProgram() {
+  return `from hub import sound
+import runloop
+
+async def main():
+    await sound.beep(440, 150, 100)
+    await sound.beep(554, 250, 100)
+
+runloop.run(main())
+`;
+}
+
+const SAMPLE_CODE = `from hub import port, light_matrix
+import motor, runloop
+
+async def main():
+    await light_matrix.write("Hi!")
+    # drive forward for 1 second, then spin
+    motor.run(port.A, -500)
+    motor.run(port.B, 500)
+    await runloop.sleep_ms(1000)
+    motor.run(port.A, 400)
+    await runloop.sleep_ms(800)
+    motor.stop(port.A)
+    motor.stop(port.B)
+    print("done")
+
+runloop.run(main())
+`;
+
+/** Stable signature of everything that affects installed programs. */
+function configSignature(cfg) {
+  return JSON.stringify([1, cfg.leftPort, cfg.rightPort, cfg.revLeft, cfg.revRight, cfg.speed, cfg.turn, cfg.slotBase]);
+}
+
+// ---- app.js
+
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+let hub = null;
+let installedSig = null;   // config signature currently on the hub
+let installing = false;
+let desired = null;        // direction key the user wants, or null
+let active = null;         // slot currently running (that we started), or null
+let reconciling = false;
+
+// ------------------------------------------------------------- settings ----
+for (const sel of [$('leftPort'), $('rightPort')]) {
+  for (const p of PORTS) sel.add(new Option(`Port ${p}`, p));
+}
+const saved = store.get('spike-car-settings', {});
+$('leftPort').value = saved.leftPort ?? 'A';
+$('rightPort').value = saved.rightPort ?? 'B';
+$('revLeft').checked = saved.revLeft ?? true;
+$('revRight').checked = saved.revRight ?? false;
+$('speed').value = saved.speed ?? 60;
+$('turn').value = saved.turn ?? 40;
+$('slotBase').value = saved.slotBase ?? 10;
+$('code').value = store.get('spike-car-code', SAMPLE_CODE);
+
+function config() {
+  const base = Math.min(20 - PROGRAM_COUNT, Math.max(0, parseInt($('slotBase').value, 10) || 0));
+  return {
+    leftPort: $('leftPort').value, rightPort: $('rightPort').value,
+    revLeft: $('revLeft').checked, revRight: $('revRight').checked,
+    speed: +$('speed').value, turn: +$('turn').value, slotBase: base,
+  };
+}
+
+function refreshSettingsUI() {
+  const c = config();
+  $('speedOut').textContent = `${c.speed}%`;
+  $('turnOut').textContent = `${c.turn}%`;
+  $('slotRange').textContent = `uses ${c.slotBase}–${c.slotBase + PROGRAM_COUNT - 1}`;
+  store.set('spike-car-settings', c);
+  const ready = hub?.connected && installedSig === configSignature(c);
+  $('installBtn').disabled = !hub?.connected || installing;
+  $('installBtn').textContent = ready ? 'Reinstall drive programs' : 'Install drive programs';
+  if (hub?.connected && !installing) {
+    setStatus(ready ? 'Ready to drive.' : 'Settings changed — install to apply.', ready ? 'ok' : '');
+  }
+}
+
+for (const id of ['leftPort', 'rightPort', 'revLeft', 'revRight', 'slotBase']) $(id).addEventListener('change', refreshSettingsUI);
+for (const id of ['speed', 'turn']) {
+  $(id).addEventListener('input', refreshSettingsUI);
+  // speed changes need new programs on the hub; reinstall automatically
+  $(id).addEventListener('change', () => { if (hub?.connected && installedSig) install(); });
+}
+$('code').addEventListener('input', () => store.set('spike-car-code', $('code').value));
+
+// ---------------------------------------------------------------- log ------
+function log(text, cls) {
+  const el = $('log');
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+  const line = document.createElement('div');
+  if (cls) line.style.color = cls === 'err' ? 'var(--stop)' : 'var(--muted)';
+  line.textContent = text;
+  el.append(line);
+  while (el.childNodes.length > 400) el.firstChild.remove();
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(text, cls = '') {
+  const s = $('installStatus');
+  s.textContent = text;
+  s.className = `status ${cls}`;
+}
+
+// ------------------------------------------------------------ connect ------
+if (!navigator.bluetooth) $('noBt').style.display = 'block';
+
+$('connectBtn').addEventListener('click', async () => {
+  if (hub?.connected) { await stopAll(); hub.disconnect(); return; }
+  hub = new Hub();
+  hub.addEventListener('message', (e) => onMessage(e.message));
+  hub.addEventListener('disconnect', onDisconnect);
+  $('connectBtn').disabled = true;
+  $('hubInfo').textContent = 'Connecting…';
+  try {
+    const info = await hub.connect();
+    $('dot').classList.add('on');
+    $('hubInfo').textContent = `${hub.device.name || 'Hub'} · fw ${info.firmware}`;
+    $('connectBtn').textContent = 'Disconnect';
+    $('runBtn').disabled = false;
+    $('stopCodeBtn').disabled = false;
+    log(`Connected to ${hub.device.name || 'hub'} (firmware ${info.firmware}, RPC ${info.rpc})`, 'muted');
+    await hub.enableDeviceNotifications(250).catch(() => log('Could not enable sensor data', 'err'));
+    installedSig = store.get(`spike-car-installed:${hub.device.id}`, null);
+    refreshSettingsUI();
+    if (installedSig !== configSignature(config())) await install();
+  } catch (err) {
+    if (err.name === 'SecurityError') {
+      // e.g. page embedded in a frame that isn't allowed to use Bluetooth
+      $('noBt').style.display = 'block';
+      log('Bluetooth is blocked on this page. Download the app file and open it in Chrome or Edge instead.', 'err');
+    } else if (err.name !== 'NotFoundError') log(`Connection failed: ${err.message}`, 'err'); // NotFoundError = picker cancelled
+    if (hub?.connected) hub.disconnect(); else onDisconnect();
+  } finally {
+    $('connectBtn').disabled = false;
+  }
+});
+
+function onDisconnect() {
+  $('dot').classList.remove('on');
+  $('hubInfo').textContent = 'Not connected';
+  $('connectBtn').textContent = 'Connect hub';
+  $('runBtn').disabled = $('stopCodeBtn').disabled = true;
+  active = null; desired = null; installing = false; installedSig = null;
+  renderPad();
+  refreshSettingsUI();
+  setStatus('Disconnected.');
+  if (hub) log('Disconnected', 'muted');
+  telemetry.clear();
+  renderTelemetry();
+}
+
+// ------------------------------------------------------------ install ------
+async function install() {
+  if (installing || !hub?.connected) return;
+  installing = true;
+  desired = null;
+  await stopAll();
+  const cfg = config();
+  const jobs = [
+    ...DIR_ORDER.map((d) => [slotFor(cfg.slotBase, d), driveProgram(d, cfg)]),
+    [slotFor(cfg.slotBase, HORN), hornProgram()],
+  ];
+  refreshSettingsUI();
+  try {
+    for (let i = 0; i < jobs.length; i++) {
+      setStatus(`Installing program ${i + 1} of ${jobs.length}…`);
+      $('progress').style.width = `${(i / jobs.length) * 100}%`;
+      await hub.uploadProgram(jobs[i][0], jobs[i][1]);
+    }
+    $('progress').style.width = '100%';
+    installedSig = configSignature(cfg);
+    store.set(`spike-car-installed:${hub.device.id}`, installedSig);
+  } catch (err) {
+    setStatus(`Install failed: ${err.message}`, 'err');
+    log(`Install failed: ${err.message}`, 'err');
+    installedSig = null;
+  } finally {
+    installing = false;
+    setTimeout(() => { $('progress').style.width = '0'; }, 600);
+    refreshSettingsUI();
+    // the user may have moved the slider again while we were installing
+    if (hub?.connected && installedSig && installedSig !== configSignature(config())) install();
+  }
+}
+$('installBtn').addEventListener('click', install);
+
+// ------------------------------------------------------------- driving -----
+const ready = () => hub?.connected && !installing && installedSig === configSignature(config());
+
+function drive(dir) {
+  if (dir && !ready()) {
+    if (hub?.connected && !installing) setStatus('Install the drive programs first.', 'err');
+    dir = null;
+  }
+  if (dir === desired) return;
+  desired = dir;
+  renderPad();
+  reconcile();
+}
+
+// Converge the hub's running program to `desired`, coalescing rapid changes.
+async function reconcile() {
+  if (reconciling) return;
+  reconciling = true;
+  try {
+    while (hub?.connected) {
+      const wantSlot = desired ? slotFor(installedSigBase(), desired) : null;
+      if (wantSlot === active) break;
+      if (active !== null) {
+        await hub.stopProgram(active).catch(() => {});
+        active = null;
+      }
+      if (wantSlot !== null && desired) {
+        const res = await hub.startProgram(wantSlot);
+        if (res.success) active = wantSlot;
+        else { log(`Hub refused to start slot ${wantSlot}`, 'err'); desired = null; renderPad(); }
+      }
+    }
+  } catch (err) {
+    log(`Drive error: ${err.message}`, 'err');
+    desired = null; renderPad();
+  } finally {
+    reconciling = false;
+  }
+}
+const installedSigBase = () => config().slotBase;
+
+async function stopAll() {
+  desired = null;
+  renderPad();
+  if (!hub?.connected) return;
+  const slot = active ?? config().slotBase;
+  active = null;
+  await hub.stopProgram(slot).catch(() => {});
+}
+
+async function horn() {
+  if (!ready()) return;
+  desired = null; renderPad();
+  while (reconciling) await new Promise((r) => setTimeout(r, 20));
+  if (active !== null) { await hub.stopProgram(active).catch(() => {}); active = null; }
+  const slot = slotFor(config().slotBase, HORN);
+  const res = await hub.startProgram(slot).catch(() => null);
+  if (res?.success) active = slot;
+}
+
+// pad (pointer)
+const padButtons = [...document.querySelectorAll('#pad [data-dir]')];
+let pointerDir = null;
+for (const btn of padButtons) {
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId);
+    pointerDir = btn.dataset.dir;
+    updateInput();
+  });
+  const release = () => { if (pointerDir === btn.dataset.dir) { pointerDir = null; updateInput(); } };
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointercancel', release);
+  btn.addEventListener('lostpointercapture', release);
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+$('stopBtn').addEventListener('click', () => { pointerDir = null; keys.clear(); stopAll(); });
+$('hornBtn').addEventListener('click', horn);
+
+function renderPad() {
+  for (const b of padButtons) b.classList.toggle('active', b.dataset.dir === desired);
+}
+
+// keyboard
+const keys = new Set();
+const KEYMAP = { ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r' };
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest('textarea, input, select')) return;
+  if (e.code === 'Space') { e.preventDefault(); keys.clear(); pointerDir = null; stopAll(); return; }
+  if (e.code === 'KeyH' && !e.repeat) { horn(); return; }
+  const k = KEYMAP[e.code];
+  if (!k) return;
+  e.preventDefault();
+  keys.add(k); updateInput();
+});
+window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) { keys.delete(k); updateInput(); } });
+window.addEventListener('blur', () => { keys.clear(); pointerDir = null; gamepadDir = null; updateInput(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { keys.clear(); pointerDir = null; updateInput(); } });
+
+function dirFromVector(x, y) { // x: -1 left .. 1 right, y: -1 back .. 1 forward
+  if (!x && !y) return null;
+  if (y > 0) return x < 0 ? 'fl' : x > 0 ? 'fr' : 'f';
+  if (y < 0) return x < 0 ? 'bl' : x > 0 ? 'br' : 'b';
+  return x < 0 ? 'l' : 'r';
+}
+
+function keyboardDir() {
+  const x = (keys.has('r') ? 1 : 0) - (keys.has('l') ? 1 : 0);
+  const y = (keys.has('u') ? 1 : 0) - (keys.has('d') ? 1 : 0);
+  return dirFromVector(x, y);
+}
+
+// gamepad (left stick or d-pad)
+let gamepadDir = null;
+function pollGamepad() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  let dir = null;
+  for (const gp of pads) {
+    let x = gp.axes[0] ?? 0, y = -(gp.axes[1] ?? 0);
+    if (gp.buttons[12]?.pressed) y = 1;
+    if (gp.buttons[13]?.pressed) y = -1;
+    if (gp.buttons[14]?.pressed) x = -1;
+    if (gp.buttons[15]?.pressed) x = 1;
+    const mag = Math.hypot(x, y);
+    if (mag > 0.45) {
+      const a = Math.atan2(y, x); // 8 sectors
+      const sx = Math.abs(Math.cos(a)) > 0.38 ? Math.sign(x) : 0;
+      const sy = Math.abs(Math.sin(a)) > 0.38 ? Math.sign(y) : 0;
+      dir = dirFromVector(sx, sy);
+    }
+    if (gp.buttons[0]?.pressed && !pollGamepad.hornDown) horn();
+    pollGamepad.hornDown = !!gp.buttons[0]?.pressed;
+  }
+  if (dir !== gamepadDir) { gamepadDir = dir; updateInput(); }
+  if (pads.length) requestAnimationFrame(pollGamepad); else pollGamepad.running = false;
+}
+window.addEventListener('gamepadconnected', () => {
+  log('Gamepad connected', 'muted');
+  if (!pollGamepad.running) { pollGamepad.running = true; requestAnimationFrame(pollGamepad); }
+});
+
+function updateInput() { drive(pointerDir ?? keyboardDir() ?? gamepadDir); }
+
+// ------------------------------------------------------------ custom code --
+$('runBtn').addEventListener('click', async () => {
+  const slot = Math.min(19, Math.max(0, parseInt($('codeSlot').value, 10) || 0));
+  const base = config().slotBase;
+  if (slot >= base && slot < base + PROGRAM_COUNT && !confirm(`Slot ${slot} is used by the drive programs. Overwrite it?`)) return;
+  $('runBtn').disabled = true;
+  try {
+    await stopAll();
+    log(`Uploading to slot ${slot}…`, 'muted');
+    await hub.uploadProgram(slot, $('code').value);
+    if (slot >= base && slot < base + PROGRAM_COUNT) { installedSig = null; refreshSettingsUI(); }
+    const res = await hub.startProgram(slot);
+    if (res.success) { active = slot; log(`Running slot ${slot}`, 'muted'); } else log('Hub refused to start the program', 'err');
+  } catch (err) {
+    log(`Run failed: ${err.message}`, 'err');
+  } finally {
+    $('runBtn').disabled = !hub?.connected;
+  }
+});
+$('stopCodeBtn').addEventListener('click', async () => {
+  const slot = Math.min(19, Math.max(0, parseInt($('codeSlot').value, 10) || 0));
+  desired = null; renderPad();
+  await hub?.stopProgram(active ?? slot).catch(() => {});
+  active = null;
+});
+
+// ------------------------------------------------------------ messages -----
+const telemetry = new Map();
+const COLORS = ['Black', 'Magenta', 'Purple', 'Blue', 'Azure', 'Turquoise', 'Green', 'Yellow', 'Orange', 'Red', 'White'];
+const MOTOR_TYPES = { 0x30: 'Medium motor', 0x31: 'Large motor', 0x41: 'Small motor' };
+
+function onMessage(m) {
+  switch (m.id) {
+    case MSG.ConsoleNotification:
+      log(m.text.replace(/\n$/, ''));
+      break;
+    case MSG.ProgramFlowNotification:
+      // only trust "stopped" when we aren't switching programs ourselves; a late
+      // notice for the previous program could otherwise clobber the new one
+      if (m.stopped && !desired && !reconciling) active = null;
+      break;
+    case MSG.DeviceNotification:
+      for (const d of m.devices) {
+        const P = PORTS[d.port] ?? '?';
+        if (d.kind === 'battery') telemetry.set('battery', ['Battery', `${d.level}%`]);
+        else if (d.kind === 'imu') telemetry.set('imu', ['Tilt (pitch / roll)', `${d.pitch} / ${d.roll}`]);
+        else if (d.kind === 'motor') telemetry.set(`p${d.port}`, [`${P} · ${MOTOR_TYPES[d.type] ?? 'Motor'}`, `${d.position}° · ${d.speed}%`]);
+        else if (d.kind === 'distance') telemetry.set(`p${d.port}`, [`${P} · Distance`, d.mm < 0 ? '—' : `${(d.mm / 10).toFixed(1)} cm`]);
+        else if (d.kind === 'color') telemetry.set(`p${d.port}`, [`${P} · Color`, COLORS[d.color] ?? '—']);
+        else if (d.kind === 'force') telemetry.set(`p${d.port}`, [`${P} · Force`, `${d.value}%${d.pressed ? ' ●' : ''}`]);
+      }
+      renderTelemetry();
+      break;
+  }
+}
+
+let telemetryFrame = 0;
+function renderTelemetry() {
+  if (telemetryFrame) return;
+  telemetryFrame = requestAnimationFrame(() => {
+    telemetryFrame = 0;
+    const el = $('telemetry');
+    if (!telemetry.size) { el.innerHTML = '<div class="empty">Connect the hub to see live data.</div>'; return; }
+    const keys = [...telemetry.keys()].sort();
+    el.replaceChildren(...keys.map((k) => {
+      const [label, value] = telemetry.get(k);
+      const t = document.createElement('div');
+      t.className = 'tile';
+      t.innerHTML = '<div class="k"></div><div class="v"></div>';
+      t.firstChild.textContent = label;
+      t.lastChild.textContent = value;
+      return t;
+    }));
+  });
+}
+
+refreshSettingsUI();
+
+</script>
+</body>
+</html>
