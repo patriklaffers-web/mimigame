@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<!-- ARTIFACT-START -->
+<title>Hlavné mestá Európy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: atlas sheet — header with progress, one entry bar, then a grid of regions, each a list of blank slots that fill in */
+:root {
+  --bg: #eef2f5;
+  --sheet: #ffffff;
+  --ink: #132a3e;
+  --muted: #5b6f80;
+  --line: #d3dde5;
+  --accent: #1f6fb2;
+  --ok: #1d7a4f;
+  --ok-bg: #e3f3ea;
+  --bad: #b3362d;
+  --bad-bg: #fbe8e6;
+  --slot: #f4f7f9;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1822; --sheet: #14222f; --ink: #e4edf4; --muted: #93a6b6; --line: #253747;
+  --accent: #5aa8e6; --ok: #5fcf97; --ok-bg: #143327; --bad: #f08a80; --bad-bg: #3a1c1a; --slot: #1a2b3a;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0d1822; --sheet: #14222f; --ink: #e4edf4; --muted: #93a6b6; --line: #253747;
+  --accent: #5aa8e6; --ok: #5fcf97; --ok-bg: #143327; --bad: #f08a80; --bad-bg: #3a1c1a; --slot: #1a2b3a;
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+  margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(28px, 5vw, 44px); line-height: 1; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+.sub { margin: 6px 0 0; color: var(--muted); }
+.stats { display: flex; gap: 20px; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.stat { display: grid; gap: 2px; }
+.stat b { font-size: 26px; font-weight: 500; line-height: 1; }
+.stat span { font-family: var(--f-body); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s ease; }
+
+form.entry {
+  background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+  display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  box-shadow: 0 6px 20px -14px rgba(19,42,62,.45);
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+label { display: grid; gap: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; min-width: 0; }
+input {
+  font: 500 17px var(--f-body); color: var(--ink); background: var(--slot);
+  border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; min-width: 0;
+  text-transform: none; letter-spacing: 0;
+}
+input:focus { outline: none; border-color: var(--accent); background: var(--sheet); }
+button {
+  font: 600 15px var(--f-body); border-radius: 8px; padding: 11px 16px; cursor: pointer;
+  border: 1.5px solid var(--accent); background: var(--accent); color: var(--sheet);
+}
+button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+button:hover { filter: brightness(1.07); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.msg { grid-column: 1 / -1; min-height: 1.45em; margin: 0; font-weight: 500; }
+.msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); } .msg.info { color: var(--muted); }
+
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.tools .hint { color: var(--muted); font-size: 13px; margin: 0; }
+.tools .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.region { background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 10px; min-width: 0; }
+.region h2 { font-family: var(--f-display); font-weight: 700; font-size: 18px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+.region h2 small { font-family: var(--f-mono); font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.region ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.region li {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px;
+  background: var(--slot); font-size: 14px; min-height: 32px; align-items: center;
+}
+.region li span { min-width: 0; overflow-wrap: anywhere; }
+.region li .cap { color: var(--muted); }
+.region li.empty span { color: transparent; position: relative; }
+.region li.empty span::after { content: ""; position: absolute; left: 0; right: 30%; top: 50%; border-top: 1.5px dashed var(--line); }
+.region li.found { background: var(--ok-bg); }
+.region li.found .cap { color: var(--ok); font-weight: 600; }
+.region li.missed { background: var(--bad-bg); }
+.region li.missed span { color: var(--bad); }
+.region li.flash { animation: flash .9s ease; }
+@keyframes flash { 0% { transform: scale(1.04); box-shadow: 0 0 0 3px var(--ok); } 100% { transform: none; box-shadow: none; } }
+
+.done { background: var(--ok-bg); color: var(--ok); border-radius: 12px; padding: 16px; font-weight: 600; font-size: 17px; }
+.done[hidden] { display: none !important; }
+
+@media (max-width: 560px) {
+  form.entry { grid-template-columns: 1fr 1fr; }
+  form.entry button { grid-column: 1 / -1; }
+  .stats { gap: 16px; }
+  .regions { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .region li.flash { animation: none; } .bar i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Hlavné mestá Európy</h1>
+      <p class="sub">Napíš štát a jeho hlavné mesto. Diakritiku písať nemusíš.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="score">0/46</b><span>uhádnuté</span></div>
+      <div class="stat"><b id="time">0:00</b><span>čas</span></div>
+      <div class="stat"><b id="errors">0</b><span>chyby</span></div>
+    </div>
+  </header>
+  <div class="bar"><i id="bar"></i></div>
+
+  <form class="entry" id="entry" autocomplete="off">
+    <label for="country">Štát<input id="country" placeholder="napr. Slovensko" autocapitalize="words" spellcheck="false"></label>
+    <label for="capital">Hlavné mesto<input id="capital" placeholder="napr. Bratislava" autocapitalize="words" spellcheck="false"></label>
+    <button type="submit" id="submit">Potvrdiť</button>
+    <p class="msg info" id="msg" aria-live="polite">Enter v poli Štát ťa presunie na hlavné mesto.</p>
+  </form>
+
+  <div class="done" id="done" hidden></div>
+
+  <div class="tools">
+    <p class="hint">Štáty sú zoradené podľa regiónov, aby si vedel, koľko ti ešte kde chýba.</p>
+    <div class="btns">
+      <button type="button" class="ghost" id="giveup">Vzdať sa a ukázať zvyšok</button>
+      <button type="button" class="ghost" id="restart">Hrať znova</button>
+    </div>
+  </div>
+
+  <div class="regions" id="regions"></div>
+</div>
+
+<script>
+// [štát, hlavné mesto, región, alternatívne názvy štátu, alternatívne názvy mesta]
+const DATA = [
+  ["Spojené kráľovstvo","Londýn","Západná Európa",["Veľká Británia","Británia","Anglicko","UK","Spojene kralovstvo Velkej Britanie"],["London"]],
+  ["Írsko","Dublin","Západná Európa",["Irska republika"],[]],
+  ["Francúzsko","Paríž","Západná Európa",[],["Paris"]],
+  ["Belgicko","Brusel","Západná Európa",[],["Brussel","Bruxelles"]],
+  ["Holandsko","Amsterdam","Západná Európa",["Nizozemsko","Nizozemsko kralovstvo"],[]],
+  ["Luxembursko","Luxemburg","Západná Európa",["Luxembourg"],["Luxembourg","Luxembursko"]],
+  ["Monako","Monako","Západná Európa",["Monaco"],["Monaco"]],
+
+  ["Island","Reykjavík","Severná Európa",[],["Reykjavik"]],
+  ["Nórsko","Oslo","Severná Európa",[],[]],
+  ["Švédsko","Štokholm","Severná Európa",[],["Stockholm"]],
+  ["Fínsko","Helsinki","Severná Európa",[],["Helsinky"]],
+  ["Dánsko","Kodaň","Severná Európa",[],["Kodan","Kobenhavn","Copenhagen"]],
+  ["Estónsko","Tallinn","Severná Európa",[],["Talin"]],
+  ["Lotyšsko","Riga","Severná Európa",[],[]],
+  ["Litva","Vilnius","Severná Európa",[],["Vilno"]],
+
+  ["Nemecko","Berlín","Stredná Európa",[],["Berlin"]],
+  ["Poľsko","Varšava","Stredná Európa",[],["Warszawa"]],
+  ["Česko","Praha","Stredná Európa",["Česká republika","Cesko"],[]],
+  ["Slovensko","Bratislava","Stredná Európa",["Slovenská republika"],[]],
+  ["Maďarsko","Budapešť","Stredná Európa",[],["Budapest"]],
+  ["Rakúsko","Viedeň","Stredná Európa",[],["Wien","Vieden"]],
+  ["Švajčiarsko","Bern","Stredná Európa",[],[]],
+  ["Lichtenštajnsko","Vaduz","Stredná Európa",["Liechtenstein","Lichtenstajnsko"],[]],
+  ["Slovinsko","Ľubľana","Stredná Európa",[],["Ljubljana","Lublana"]],
+
+  ["Portugalsko","Lisabon","Južná Európa",[],["Lisboa"]],
+  ["Španielsko","Madrid","Južná Európa",[],[]],
+  ["Andorra","Andorra la Vella","Južná Európa",[],["Andorra"]],
+  ["Taliansko","Rím","Južná Európa",[],["Roma","Rim"]],
+  ["Vatikán","Vatikán","Južná Európa",["Vatikan","Svätá stolica"],["Vatikan"]],
+  ["San Maríno","San Maríno","Južná Európa",["San Marino"],["San Marino"]],
+  ["Malta","Valletta","Južná Európa",[],["Valeta","La Valletta"]],
+  ["Grécko","Atény","Južná Európa",[],["Atheny","Athens","Athina"]],
+  ["Cyprus","Nikózia","Južná Európa",[],["Nikosia","Lefkosia"]],
+
+  ["Chorvátsko","Záhreb","Balkán",[],["Zagreb"]],
+  ["Bosna a Hercegovina","Sarajevo","Balkán",["Bosna","BiH","Bosna Hercegovina"],[]],
+  ["Srbsko","Belehrad","Balkán",[],["Beograd","Belgrad"]],
+  ["Čierna Hora","Podgorica","Balkán",["Montenegro"],[]],
+  ["Kosovo","Priština","Balkán",[],["Pristina"]],
+  ["Albánsko","Tirana","Balkán",[],["Tirane"]],
+  ["Severné Macedónsko","Skopje","Balkán",["Macedónsko"],[]],
+  ["Bulharsko","Sofia","Balkán",[],["Sofija"]],
+  ["Rumunsko","Bukurešť","Balkán",[],["Bucuresti","Bukurest"]],
+
+  ["Moldavsko","Kišiňov","Východná Európa",["Moldavská republika","Moldova"],["Chisinau","Kisinov","Kišinev"]],
+  ["Ukrajina","Kyjev","Východná Európa",[],["Kijev","Kiev","Kyiv"]],
+  ["Bielorusko","Minsk","Východná Európa",["Belorusko","Bělorusko"],[]],
+  ["Rusko","Moskva","Východná Európa",["Ruská federácia"],["Moscow"]],
+];
+
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0]; prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+// presná zhoda, alebo jeden preklep pri dlhších slovách
+function matches(input, names) {
+  const x = norm(input);
+  if (!x) return false;
+  return names.some(n => { const y = norm(n); return x === y || (y.length >= 6 && lev(x, y) <= 1); });
+}
+
+const items = DATA.map(([country, capital, region, ca, pa], i) => ({
+  i, country, capital, region, countryNames: [country, ...ca], capitalNames: [capital, ...pa], state: "empty", el: null
+}));
+const TOTAL = items.length;
+
+const $ = id => document.getElementById(id);
+const regionsEl = $("regions"), msg = $("msg"), countryIn = $("country"), capitalIn = $("capital");
+let found = 0, errors = 0, startedAt = null, timerId = null, over = false;
+const regionCounters = {};
+
+function build() {
+  regionsEl.innerHTML = "";
+  const groups = {};
+  items.forEach(it => (groups[it.region] ||= []).push(it));
+  for (const [name, list] of Object.entries(groups)) {
+    const sec = document.createElement("section");
+    sec.className = "region";
+    sec.innerHTML = `<h2>${name}<small></small></h2><ol></ol>`;
+    const ol = sec.querySelector("ol");
+    list.sort((a, b) => a.country.localeCompare(b.country, "sk"));
+    list.forEach(it => {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.innerHTML = `<span class="cty"></span><span class="cap"></span>`;
+      it.el = li; it.state = "empty";
+      ol.appendChild(li);
+    });
+    regionCounters[name] = { el: sec.querySelector("small"), list };
+    regionsEl.appendChild(sec);
+  }
+  refresh();
+}
+
+function fill(it, state) {
+  it.state = state;
+  it.el.className = state;
+  it.el.querySelector(".cty").textContent = it.country;
+  it.el.querySelector(".cap").textContent = it.capital;
+}
+
+function refresh() {
+  $("score").textContent = `${found}/${TOTAL}`;
+  $("errors").textContent = errors;
+  $("bar").style.width = (found / TOTAL * 100) + "%";
+  for (const r of Object.values(regionCounters)) {
+    r.el.textContent = `${r.list.filter(x => x.state === "found").length}/${r.list.length}`;
+  }
+}
+
+const fmt = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+function startTimer() {
+  if (startedAt) return;
+  startedAt = Date.now();
+  timerId = setInterval(() => { $("time").textContent = fmt(Date.now() - startedAt); }, 250);
+}
+function stopTimer() { clearInterval(timerId); if (startedAt) $("time").textContent = fmt(Date.now() - startedAt); }
+
+function say(text, kind) { msg.textContent = text; msg.className = "msg " + kind; }
+
+countryIn.addEventListener("input", startTimer);
+countryIn.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); if (countryIn.value.trim()) capitalIn.focus(); }
+});
+
+$("entry").addEventListener("submit", e => {
+  e.preventDefault();
+  if (over) return;
+  const c = countryIn.value.trim(), p = capitalIn.value.trim();
+  if (!c || !p) { say("Vyplň štát aj hlavné mesto.", "info"); (c ? capitalIn : countryIn).focus(); return; }
+  startTimer();
+  const it = items.find(x => matches(c, x.countryNames));
+  if (!it) {
+    errors++; refresh();
+    say(`„${c}“ nie je v zozname európskych štátov. Skontroluj pravopis.`, "bad");
+    countryIn.select(); countryIn.focus(); return;
+  }
+  if (it.state === "found") {
+    say(`${it.country} už máš. Skús iný štát.`, "info");
+    countryIn.value = ""; capitalIn.value = ""; countryIn.focus(); return;
+  }
+  if (!matches(p, it.capitalNames)) {
+    errors++; refresh();
+    say(`${p} nie je hlavné mesto štátu ${it.country}. Skús to znova.`, "bad");
+    capitalIn.select(); capitalIn.focus(); return;
+  }
+  found++;
+  fill(it, "found");
+  it.el.classList.add("flash");
+  setTimeout(() => it.el.classList.remove("flash"), 900);
+  refresh();
+  say(`Správne: ${it.country} – ${it.capital}. Zostáva ${TOTAL - found}.`, "ok");
+  countryIn.value = ""; capitalIn.value = ""; countryIn.focus();
+  if (found === TOTAL) finish(true);
+});
+
+function finish(won) {
+  over = true; stopTimer();
+  countryIn.disabled = capitalIn.disabled = $("submit").disabled = true;
+  const done = $("done");
+  done.hidden = false;
+  if (won) {
+    done.textContent = `Hotovo! Všetkých ${TOTAL} štátov za ${$("time").textContent}, počet chýb: ${errors}.`;
+  } else {
+    items.filter(x => x.state !== "found").forEach(x => fill(x, "missed"));
+    done.textContent = `Uhádol si ${found} z ${TOTAL}. Červené sú tie, ktoré ti chýbali.`;
+  }
+  say(won ? "Výborne!" : "Hra skončila. Klikni na Hrať znova.", won ? "ok" : "info");
+}
+
+$("giveup").addEventListener("click", () => { if (!over) finish(false); });
+$("restart").addEventListener("click", () => {
+  found = 0; errors = 0; over = false; clearInterval(timerId); startedAt = null;
+  $("time").textContent = "0:00"; $("done").hidden = true;
+  countryIn.disabled = capitalIn.disabled = $("submit").disabled = false;
+  countryIn.value = ""; capitalIn.value = "";
+  build(); say("Nová hra. Začni písať štát.", "info"); countryIn.focus();
+});
+
+build();
+</script>
+<!-- ARTIFACT-END -->
+</body>
+</html>
