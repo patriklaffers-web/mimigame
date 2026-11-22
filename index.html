@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-/* Layout: atlas sheet — header with progress, one entry bar, then a grid of regions, each a list of blank slots that fill in */
+/* Layout: atlas worksheet — header with mode switch and progress, then regions; each row shows the given name and a blank to fill */
 :root {
   --bg: #eef2f5;
   --sheet: #ffffff;
@@ -45,110 +45,108 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 24px 48px;
 }
-.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 18px; }
 
 header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
 h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(28px, 5vw, 44px); line-height: 1; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
-.sub { margin: 6px 0 0; color: var(--muted); }
+.sub { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+
+.modes { display: inline-flex; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 4px; gap: 4px; flex-wrap: wrap; }
+.modes button {
+  font: 600 15px var(--f-body); border: 0; border-radius: 7px; padding: 9px 14px; cursor: pointer;
+  background: transparent; color: var(--muted);
+}
+.modes button[aria-selected="true"] { background: var(--accent); color: var(--sheet); }
+.modes button small { font-family: var(--f-mono); font-weight: 500; font-size: 12px; margin-left: 6px; opacity: .8; }
+
+.panel {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  display: grid; gap: 10px; box-shadow: 0 6px 20px -14px rgba(19,42,62,.45);
+}
+.panel-top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
 .stats { display: flex; gap: 20px; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 .stat { display: grid; gap: 2px; }
-.stat b { font-size: 26px; font-weight: 500; line-height: 1; }
+.stat b { font-size: 22px; font-weight: 500; line-height: 1; }
 .stat span { font-family: var(--f-body); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btns button {
+  font: 600 14px var(--f-body); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  border: 1.5px solid var(--line); background: transparent; color: var(--ink);
+}
+.btns button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s ease; }
-
-form.entry {
-  background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
-  display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
-  box-shadow: 0 6px 20px -14px rgba(19,42,62,.45);
-}
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
-label { display: grid; gap: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; min-width: 0; }
-input {
-  font: 500 17px var(--f-body); color: var(--ink); background: var(--slot);
-  border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; min-width: 0;
-  text-transform: none; letter-spacing: 0;
-}
-input:focus { outline: none; border-color: var(--accent); background: var(--sheet); }
-button {
-  font: 600 15px var(--f-body); border-radius: 8px; padding: 11px 16px; cursor: pointer;
-  border: 1.5px solid var(--accent); background: var(--accent); color: var(--sheet);
-}
-button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
-button:hover { filter: brightness(1.07); }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.msg { grid-column: 1 / -1; min-height: 1.45em; margin: 0; font-weight: 500; }
+.msg { min-height: 1.45em; margin: 0; font-weight: 500; font-size: 14px; }
 .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); } .msg.info { color: var(--muted); }
 
-.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-.tools .hint { color: var(--muted); font-size: 13px; margin: 0; }
-.tools .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.done { background: var(--ok-bg); color: var(--ok); border-radius: 12px; padding: 16px; font-weight: 600; font-size: 17px; }
 
-.regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 .region { background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 10px; min-width: 0; }
-.region h2 { font-family: var(--f-display); font-weight: 700; font-size: 18px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+.region h2 { font-family: var(--f-display); font-weight: 700; font-size: 18px; margin: 0 0 4px; display: flex; justify-content: space-between; align-items: baseline; }
 .region h2 small { font-family: var(--f-mono); font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 8px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
 .region ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .region li {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px;
-  background: var(--slot); font-size: 14px; min-height: 32px; align-items: center;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 4px 4px 4px 8px; border-radius: 6px;
+  background: var(--slot); font-size: 14px; align-items: center; min-height: 40px;
 }
-.region li span { min-width: 0; overflow-wrap: anywhere; }
-.region li .cap { color: var(--muted); }
-.region li.empty span { color: transparent; position: relative; }
-.region li.empty span::after { content: ""; position: absolute; left: 0; right: 30%; top: 50%; border-top: 1.5px dashed var(--line); }
+.region li .given { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.region li .ans { min-width: 0; overflow-wrap: anywhere; }
+.region li input {
+  font: 500 15px var(--f-body); color: var(--ink); background: var(--sheet);
+  border: 1.5px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; min-width: 0;
+}
+.region li input:focus { outline: none; border-color: var(--accent); }
+.region li.wrong input { border-color: var(--bad); background: var(--bad-bg); animation: shake .3s; }
 .region li.found { background: var(--ok-bg); }
-.region li.found .cap { color: var(--ok); font-weight: 600; }
+.region li.found .ans { color: var(--ok); font-weight: 600; padding-left: 10px; }
 .region li.missed { background: var(--bad-bg); }
-.region li.missed span { color: var(--bad); }
+.region li.missed .ans { color: var(--bad); font-weight: 600; padding-left: 10px; }
 .region li.flash { animation: flash .9s ease; }
-@keyframes flash { 0% { transform: scale(1.04); box-shadow: 0 0 0 3px var(--ok); } 100% { transform: none; box-shadow: none; } }
-
-.done { background: var(--ok-bg); color: var(--ok); border-radius: 12px; padding: 16px; font-weight: 600; font-size: 17px; }
-.done[hidden] { display: none !important; }
+@keyframes flash { 0% { box-shadow: 0 0 0 3px var(--ok); } 100% { box-shadow: none; } }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
 @media (max-width: 560px) {
-  form.entry { grid-template-columns: 1fr 1fr; }
-  form.entry button { grid-column: 1 / -1; }
-  .stats { gap: 16px; }
   .regions { grid-template-columns: 1fr; }
+  .modes { width: 100%; }
+  .modes button { flex: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .region li.flash { animation: none; } .bar i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .region li.flash, .region li.wrong input { animation: none; } .bar i { transition: none; } }
 </style>
 
 <div class="wrap">
   <header>
     <div>
       <h1>Hlavné mestá Európy</h1>
-      <p class="sub">Napíš štát a jeho hlavné mesto. Diakritiku písať nemusíš.</p>
+      <p class="sub" id="sub"></p>
     </div>
-    <div class="stats">
-      <div class="stat"><b id="score">0/46</b><span>uhádnuté</span></div>
-      <div class="stat"><b id="time">0:00</b><span>čas</span></div>
-      <div class="stat"><b id="errors">0</b><span>chyby</span></div>
+    <div class="modes" role="tablist" aria-label="Mód hry">
+      <button role="tab" id="tab-mesta" data-mode="mesta">Mesto → štát<small id="tc-mesta"></small></button>
+      <button role="tab" id="tab-staty" data-mode="staty">Štát → mesto<small id="tc-staty"></small></button>
     </div>
   </header>
-  <div class="bar"><i id="bar"></i></div>
 
-  <form class="entry" id="entry" autocomplete="off">
-    <label for="country">Štát<input id="country" placeholder="napr. Slovensko" autocapitalize="words" spellcheck="false"></label>
-    <label for="capital">Hlavné mesto<input id="capital" placeholder="napr. Bratislava" autocapitalize="words" spellcheck="false"></label>
-    <button type="submit" id="submit">Potvrdiť</button>
-    <p class="msg info" id="msg" aria-live="polite">Enter v poli Štát ťa presunie na hlavné mesto.</p>
-  </form>
-
-  <div class="done" id="done" hidden></div>
-
-  <div class="tools">
-    <p class="hint">Štáty sú zoradené podľa regiónov, aby si vedel, koľko ti ešte kde chýba.</p>
-    <div class="btns">
-      <button type="button" class="ghost" id="giveup">Vzdať sa a ukázať zvyšok</button>
-      <button type="button" class="ghost" id="restart">Hrať znova</button>
+  <div class="panel">
+    <div class="panel-top">
+      <div class="stats">
+        <div class="stat"><b id="score">0/46</b><span>uhádnuté</span></div>
+        <div class="stat"><b id="time">0:00</b><span>čas</span></div>
+        <div class="stat"><b id="errors">0</b><span>chyby</span></div>
+      </div>
+      <div class="btns">
+        <button type="button" id="giveup">Vzdať sa</button>
+        <button type="button" id="restart">Hrať znova</button>
+      </div>
     </div>
+    <div class="bar"><i id="bar"></i></div>
+    <p class="msg info" id="msg" aria-live="polite"></p>
   </div>
 
+  <div class="done" id="done" hidden></div>
   <div class="regions" id="regions"></div>
 </div>
 
@@ -209,7 +207,6 @@ const DATA = [
 ];
 
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
-
 function lev(a, b) {
   if (Math.abs(a.length - b.length) > 1) return 2;
   const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
@@ -223,132 +220,182 @@ function lev(a, b) {
   }
   return prev[b.length];
 }
+const exact = (input, names) => { const x = norm(input); return !!x && names.some(n => norm(n) === x); };
 // presná zhoda, alebo jeden preklep pri dlhších slovách
-function matches(input, names) {
+const matches = (input, names) => {
   const x = norm(input);
-  if (!x) return false;
-  return names.some(n => { const y = norm(n); return x === y || (y.length >= 6 && lev(x, y) <= 1); });
-}
+  return !!x && names.some(n => { const y = norm(n); return x === y || (y.length >= 6 && lev(x, y) <= 1); });
+};
 
-const items = DATA.map(([country, capital, region, ca, pa], i) => ({
-  i, country, capital, region, countryNames: [country, ...ca], capitalNames: [capital, ...pa], state: "empty", el: null
+const ITEMS = DATA.map(([country, capital, region, ca, pa], i) => ({
+  i, country, capital, region, countryNames: [country, ...ca], capitalNames: [capital, ...pa]
 }));
-const TOTAL = items.length;
+const TOTAL = ITEMS.length;
+const REGIONS = [...new Set(ITEMS.map(x => x.region))];
+
+const MODES = {
+  mesta: {
+    sub: "Pri každom hlavnom meste je prázdne pole. Dopíš, ktorého štátu je hlavným mestom.",
+    givenCol: "Hlavné mesto", ansCol: "Štát",
+    given: it => it.capital, answer: it => it.country, names: it => it.countryNames,
+    wrong: (it, v) => `${v} nie je štát, ktorého hlavné mesto je ${it.capital}.`,
+  },
+  staty: {
+    sub: "Pri každom štáte je prázdne pole. Dopíš jeho hlavné mesto.",
+    givenCol: "Štát", ansCol: "Hlavné mesto",
+    given: it => it.country, answer: it => it.capital, names: it => it.capitalNames,
+    wrong: (it, v) => `${v} nie je hlavné mesto štátu ${it.country}.`,
+  },
+};
+
+const newState = () => ({ status: {}, found: 0, errors: 0, elapsed: 0, startedAt: null, over: false, message: null });
+const state = { mesta: newState(), staty: newState() };
+let mode = "mesta", tick = null;
 
 const $ = id => document.getElementById(id);
-const regionsEl = $("regions"), msg = $("msg"), countryIn = $("country"), capitalIn = $("capital");
-let found = 0, errors = 0, startedAt = null, timerId = null, over = false;
-const regionCounters = {};
+const fmt = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const S = () => state[mode];
+const elapsed = st => st.elapsed + (st.startedAt ? Date.now() - st.startedAt : 0);
 
-function build() {
-  regionsEl.innerHTML = "";
-  const groups = {};
-  items.forEach(it => (groups[it.region] ||= []).push(it));
-  for (const [name, list] of Object.entries(groups)) {
+function startTimer() {
+  const st = S();
+  if (st.startedAt || st.over) return;
+  st.startedAt = Date.now();
+}
+function pauseTimer(st) { if (st.startedAt) { st.elapsed += Date.now() - st.startedAt; st.startedAt = null; } }
+
+function say(text, kind) { S().message = [text, kind]; $("msg").textContent = text; $("msg").className = "msg " + kind; }
+
+function render() {
+  const m = MODES[mode], st = S();
+  document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === mode));
+  $("sub").textContent = m.sub;
+  const root = $("regions");
+  root.innerHTML = "";
+  for (const r of REGIONS) {
+    const list = ITEMS.filter(x => x.region === r).sort((a, b) => m.given(a).localeCompare(m.given(b), "sk"));
     const sec = document.createElement("section");
     sec.className = "region";
-    sec.innerHTML = `<h2>${name}<small></small></h2><ol></ol>`;
+    sec.innerHTML = `<h2>${r}<small data-region="${r}"></small></h2><div class="cols"><span>${m.givenCol}</span><span>${m.ansCol}</span></div><ol></ol>`;
     const ol = sec.querySelector("ol");
-    list.sort((a, b) => a.country.localeCompare(b.country, "sk"));
-    list.forEach(it => {
+    for (const it of list) {
       const li = document.createElement("li");
-      li.className = "empty";
-      li.innerHTML = `<span class="cty"></span><span class="cap"></span>`;
-      it.el = li; it.state = "empty";
+      li.dataset.i = it.i;
+      const given = document.createElement("span");
+      given.className = "given"; given.textContent = m.given(it);
+      li.appendChild(given);
+      const s = st.status[it.i];
+      if (s) {
+        li.className = s;
+        const a = document.createElement("span");
+        a.className = "ans"; a.textContent = m.answer(it);
+        li.appendChild(a);
+      } else {
+        const inp = document.createElement("input");
+        inp.id = `in-${mode}-${it.i}`;
+        inp.autocomplete = "off"; inp.spellcheck = false;
+        inp.setAttribute("autocapitalize", "words");
+        inp.setAttribute("enterkeyhint", "next");
+        inp.setAttribute("aria-label", `${m.ansCol} pre ${m.given(it)}`);
+        inp.disabled = st.over;
+        inp.addEventListener("input", () => { startTimer(); li.classList.remove("wrong"); if (exact(inp.value, m.names(it))) accept(it, li); });
+        inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); check(it, li, inp); } });
+        li.appendChild(inp);
+      }
       ol.appendChild(li);
-    });
-    regionCounters[name] = { el: sec.querySelector("small"), list };
-    regionsEl.appendChild(sec);
+    }
+    root.appendChild(sec);
   }
+  if (st.message) say(...st.message);
+  else say("Píš do prázdnych polí. Správna odpoveď sa uzná sama, Enter ju skontroluje a posunie ťa ďalej.", "info");
+  const done = $("done");
+  done.hidden = !st.over;
+  if (st.over) done.textContent = st.found === TOTAL
+    ? `Hotovo! Všetkých ${TOTAL} za ${fmt(elapsed(st))}, počet chýb: ${st.errors}.`
+    : `Uhádol si ${st.found} z ${TOTAL}. Červené sú tie, ktoré ti chýbali.`;
   refresh();
-}
-
-function fill(it, state) {
-  it.state = state;
-  it.el.className = state;
-  it.el.querySelector(".cty").textContent = it.country;
-  it.el.querySelector(".cap").textContent = it.capital;
 }
 
 function refresh() {
-  $("score").textContent = `${found}/${TOTAL}`;
-  $("errors").textContent = errors;
-  $("bar").style.width = (found / TOTAL * 100) + "%";
-  for (const r of Object.values(regionCounters)) {
-    r.el.textContent = `${r.list.filter(x => x.state === "found").length}/${r.list.length}`;
-  }
+  const st = S();
+  $("score").textContent = `${st.found}/${TOTAL}`;
+  $("errors").textContent = st.errors;
+  $("time").textContent = fmt(elapsed(st));
+  $("bar").style.width = (st.found / TOTAL * 100) + "%";
+  for (const k of Object.keys(MODES)) $("tc-" + k).textContent = `${state[k].found}/${TOTAL}`;
+  document.querySelectorAll("[data-region]").forEach(el => {
+    const list = ITEMS.filter(x => x.region === el.dataset.region);
+    el.textContent = `${list.filter(x => st.status[x.i] === "found").length}/${list.length}`;
+  });
 }
 
-const fmt = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
-function startTimer() {
-  if (startedAt) return;
-  startedAt = Date.now();
-  timerId = setInterval(() => { $("time").textContent = fmt(Date.now() - startedAt); }, 250);
+function focusNext(fromLi) {
+  const inputs = [...document.querySelectorAll(".region li input")];
+  if (!inputs.length) return;
+  const all = [...document.querySelectorAll(".region li")];
+  const idx = all.indexOf(fromLi);
+  const next = inputs.find(inp => all.indexOf(inp.closest("li")) > idx) || inputs[0];
+  next.focus();
 }
-function stopTimer() { clearInterval(timerId); if (startedAt) $("time").textContent = fmt(Date.now() - startedAt); }
 
-function say(text, kind) { msg.textContent = text; msg.className = "msg " + kind; }
-
-countryIn.addEventListener("input", startTimer);
-countryIn.addEventListener("keydown", e => {
-  if (e.key === "Enter") { e.preventDefault(); if (countryIn.value.trim()) capitalIn.focus(); }
-});
-
-$("entry").addEventListener("submit", e => {
-  e.preventDefault();
-  if (over) return;
-  const c = countryIn.value.trim(), p = capitalIn.value.trim();
-  if (!c || !p) { say("Vyplň štát aj hlavné mesto.", "info"); (c ? capitalIn : countryIn).focus(); return; }
-  startTimer();
-  const it = items.find(x => matches(c, x.countryNames));
-  if (!it) {
-    errors++; refresh();
-    say(`„${c}“ nie je v zozname európskych štátov. Skontroluj pravopis.`, "bad");
-    countryIn.select(); countryIn.focus(); return;
-  }
-  if (it.state === "found") {
-    say(`${it.country} už máš. Skús iný štát.`, "info");
-    countryIn.value = ""; capitalIn.value = ""; countryIn.focus(); return;
-  }
-  if (!matches(p, it.capitalNames)) {
-    errors++; refresh();
-    say(`${p} nie je hlavné mesto štátu ${it.country}. Skús to znova.`, "bad");
-    capitalIn.select(); capitalIn.focus(); return;
-  }
-  found++;
-  fill(it, "found");
-  it.el.classList.add("flash");
-  setTimeout(() => it.el.classList.remove("flash"), 900);
+function accept(it, li) {
+  const st = S(), m = MODES[mode];
+  if (st.status[it.i]) return;
+  st.status[it.i] = "found"; st.found++;
+  li.querySelector("input").remove();
+  li.className = "found flash";
+  const a = document.createElement("span");
+  a.className = "ans"; a.textContent = m.answer(it);
+  li.appendChild(a);
+  setTimeout(() => li.classList.remove("flash"), 900);
+  say(`Správne: ${m.given(it)} – ${m.answer(it)}. Zostáva ${TOTAL - st.found}.`, "ok");
   refresh();
-  say(`Správne: ${it.country} – ${it.capital}. Zostáva ${TOTAL - found}.`, "ok");
-  countryIn.value = ""; capitalIn.value = ""; countryIn.focus();
-  if (found === TOTAL) finish(true);
-});
+  if (st.found === TOTAL) finish(true); else focusNext(li);
+}
+
+function check(it, li, inp) {
+  const v = inp.value.trim();
+  if (!v) { focusNext(li); return; }
+  startTimer();
+  if (matches(v, MODES[mode].names(it))) { accept(it, li); return; }
+  S().errors++;
+  li.classList.remove("wrong"); void li.offsetWidth; li.classList.add("wrong");
+  say(MODES[mode].wrong(it, v), "bad");
+  inp.select();
+  refresh();
+}
 
 function finish(won) {
-  over = true; stopTimer();
-  countryIn.disabled = capitalIn.disabled = $("submit").disabled = true;
-  const done = $("done");
-  done.hidden = false;
-  if (won) {
-    done.textContent = `Hotovo! Všetkých ${TOTAL} štátov za ${$("time").textContent}, počet chýb: ${errors}.`;
-  } else {
-    items.filter(x => x.state !== "found").forEach(x => fill(x, "missed"));
-    done.textContent = `Uhádol si ${found} z ${TOTAL}. Červené sú tie, ktoré ti chýbali.`;
-  }
-  say(won ? "Výborne!" : "Hra skončila. Klikni na Hrať znova.", won ? "ok" : "info");
+  const st = S();
+  pauseTimer(st);
+  st.over = true;
+  if (!won) ITEMS.forEach(x => { if (!st.status[x.i]) st.status[x.i] = "missed"; });
+  st.message = won ? ["Výborne!", "ok"] : ["Hra skončila. Klikni na Hrať znova.", "info"];
+  render();
 }
 
-$("giveup").addEventListener("click", () => { if (!over) finish(false); });
-$("restart").addEventListener("click", () => {
-  found = 0; errors = 0; over = false; clearInterval(timerId); startedAt = null;
-  $("time").textContent = "0:00"; $("done").hidden = true;
-  countryIn.disabled = capitalIn.disabled = $("submit").disabled = false;
-  countryIn.value = ""; capitalIn.value = "";
-  build(); say("Nová hra. Začni písať štát.", "info"); countryIn.focus();
-});
+function setMode(m) {
+  if (!MODES[m] || m === mode) return;
+  pauseTimer(S());
+  mode = m;
+  try { history.replaceState(null, "", "#" + m); } catch (e) {}
+  render();
+}
 
-build();
+document.querySelectorAll(".modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+window.addEventListener("hashchange", () => setMode(location.hash.slice(1)));
+$("giveup").addEventListener("click", () => { if (!S().over) finish(false); });
+$("restart").addEventListener("click", () => {
+  state[mode] = newState();
+  render();
+  say("Nová hra. Začni písať.", "info");
+  const first = document.querySelector(".region li input");
+  if (first) first.focus();
+});
+tick = setInterval(() => { if (S().startedAt) $("time").textContent = fmt(elapsed(S())); }, 250);
+
+if (MODES[location.hash.slice(1)]) mode = location.hash.slice(1);
+render();
 </script>
 <!-- ARTIFACT-END -->
 </body>
